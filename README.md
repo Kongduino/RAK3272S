@@ -18,3 +18,5 @@ Since these 2 operate on the same network of BastWAN devices I have, I need to e
 4. Packets all have `UUID`, `from` and `cmd` keys. After which, there may or may not be other keys. Sender adds nothing else, but some of my BastWAN devices do. Receiver knows what to display. It also timestamps the packets so that you can keep a log of packets.
 
 So all in all they already do quite a bit. I am looking into merging them, and adding more Minimal_Lora options. A more robust solution could involve making a GUI app in Xojo. We'll see...
+
+![Receiver](Receiver.jpg)
