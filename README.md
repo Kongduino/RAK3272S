@@ -17,6 +17,6 @@ Since these 2 operate on the same network of BastWAN devices I have, I need to e
 3. But messages also have HMAC added to them. The last 28 bytes is the signature. Sender calculates SHA224 and tacks it on. Receiver compares the last 28 bytes with an HMAC it calculates on the rest of the packet.
 4. Packets all have `UUID`, `from` and `cmd` keys. After which, there may or may not be other keys. Sender adds nothing else, but some of my BastWAN devices do. Receiver knows what to display. It also timestamps the packets so that you can keep a log of packets.
 
-So all in all they already do quite a bit. I am looking into merging them, and adding more Minimal_Lora options. A more robust solution could involve making a GUI app in Xojo. We'll see...
+All in all, they already do quite a bit. I am looking into merging them, and adding more Minimal_Lora options. A more robust solution could involve making a GUI app in Xojo. We'll see...
 
 ![Receiver](Receiver.jpg)
