@@ -40,3 +40,6 @@ I have added a few commands from Minimal_LoRa:
 *  `/apx` Turn auto PING OFF (0) or every x seconds
 
 This is still a bit fragile, but seems to be working well enough! Have fun!
+
+![RAK3272S_Minimal_LoRa_#0](RAK3272S_Minimal_LoRa_#0.png)
+![RAK3272S_Minimal_LoRa_#1](RAK3272S_Minimal_LoRa_#1.png)
