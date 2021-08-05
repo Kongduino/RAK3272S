@@ -20,3 +20,23 @@ Since these 2 operate on the same network of BastWAN devices I have, I need to e
 All in all, they already do quite a bit. I am looking into merging them, and adding more Minimal_Lora options. A more robust solution could involve making a GUI app in Xojo. We'll see...
 
 ![Receiver](Receiver.jpg)
+
+## UPDATE 2021/08/05
+
+I added a new script, `RAK3272S_Minimal_LoRa.py`, which mimics the `BastWAN_Minimal_LoRa` firmware to an extent, and I have been having more issues with SF/BW combinations related to payloads. At SF 10, BW 7 (125 KHz), packets sent from BastWAN devices are received by the whole network, both BastWAN and RAK3272S. On the other hand, packets sent by RAK3272S are not received, AT ALL, by BastWAN devices, and garbled on other RAK3272S. Checking on my SDR, something is indeed being sent, but the BastWAN devices don't even react to it. I think either the AT firmware, or the hardware itself, is much stricter than needed when it comes to payload limitations: after all, if the RAK3272S can receive long (~180 bytes) payloads, it should be able to send them too (and they were slightly shorter, about 160 bytes).
+
+So while I confer with the product team, I have changed the SF/BW combo to SF 10, BW 9 (500 KHz) and long packets work fine now. SF 9, BW 7 also seems to work. I am adding various JSON prefs files for testing. You can pick a prefs file at launch by doing:
+
+`python3 RAK3272S_Minimal_LoRa.py /dev/tty.usbserial-A901LHDG sf9bw7.json`
+
+### Commands
+
+I have added a few commands from Minimal_LoRa:
+
+* `/p` PING
+* `/>xxxx` Send xxxx as a message
+* `/hm0` ~ `/hm1` Turn HMAC OFF or ON
+* `/pb0` ~ `/pb1` Turn PONG back OFF or ON
+*  `/apx` Turn auto PING OFF (0) or every x seconds
+
+This is still a bit fragile, but seems to be working well enough! Have fun!
