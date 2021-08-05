@@ -215,7 +215,6 @@ def initModule(port):
       # P2P Mode
       time.sleep(1.5)
       response = sendCmd(packOptions())
-      # 865 MHz, SD 10, BW 7 (125 KHz), CR 4/5, 8-byte preamble, TxPower 22
       time.sleep(3)
       response = sendCmd(b'AT+PRECV=65535')
       time.sleep(1.5)
@@ -334,7 +333,7 @@ if __name__ == "__main__":
       if dr != []:
         # key press, read a line
         query = input().strip()
-        print("> "+query)
+        #print("> "+query)
         if query[0:2] == "/>":
           sendMsg(query[2:])
         elif query == "/p":
@@ -345,21 +344,60 @@ if __name__ == "__main__":
         elif query == "/hm1":
           needHMAC = 1
           displayOptions()
-        elif query == "/pb0":
+        elif query == "/r0":
           pongback = 0
           displayOptions()
-        elif query == "/pb1":
+        elif query == "/r1":
           pongback = 1
           displayOptions()
-        elif query[0:3] == "/ap":
-          v=int(query[3:])
-          if v == 0:
-            autoSend = 0
-            autoFreq = 60
-          else:
-            autoSend = 1
-            autoFreq = v
-          displayOptions()
+        elif query[0:3] == "/as":
+          try:
+            v=int(query[3:])
+            if v == 0:
+              autoSend = 0
+              autoFreq = 60
+            else:
+              autoSend = 1
+              autoFreq = v
+            displayOptions()
+          except ValueError:
+            print("Bad parameter: "+query[3:])
+        elif query[0:3] == "/cr":
+          try:
+            v=int(query[3:])
+            if v not in range(5, 9):
+              print("Error: "+str(v)+" isn't the in range [5..8]")
+            else:
+              cr = v
+              response = sendCmd(packOptions())
+              time.sleep(3)
+              displayOptions()
+          except ValueError:
+            print("Bad parameter: "+query[3:])
+        elif query[0:3] == "/tx":
+          try:
+            v=int(query[3:])
+            if v not in range(7, 23):
+              print("Error: "+str(v)+" isn't the in range [7..22]")
+            else:
+              tx = v
+              response = sendCmd(packOptions())
+              time.sleep(3)
+              displayOptions()
+          except ValueError:
+            print("Bad parameter: "+query[3:])
+        elif query[0:3] == "/fq":
+          try:
+            v=float(query[3:])
+            if (v < 860.0) | (v > 1020.0):
+              print("Error: "+str(v)+" isn't the in range [860..1,020]")
+            else:
+              freq = v
+              response = sendCmd(packOptions())
+              time.sleep(3)
+              displayOptions()
+          except ValueError:
+            print("Bad parameter: "+query[3:])
       while ser.in_waiting:
         z=ser.readline()
         evalLine(z)

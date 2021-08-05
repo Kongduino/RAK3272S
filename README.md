@@ -33,11 +33,13 @@ So while I confer with the product team, I have changed the SF/BW combo to SF 10
 
 I have added a few commands from Minimal_LoRa:
 
-* `/p` PING
-* `/>xxxx` Send xxxx as a message
-* `/hm0` ~ `/hm1` Turn HMAC OFF or ON
-* `/pb0` ~ `/pb1` Turn PONG back OFF or ON
-*  `/apx` Turn auto PING OFF (0) or every x seconds
+* `/p` Sends a `PING` packet
+* `/>xxxx` Sends xxxx as a message
+* `/hm0` ~ `/hm1` Turns `HMAC` OFF or ON
+* `/r0` ~ `/r1` Turns `PONG back` OFF or ON (R = reply)
+*  `/as0` ~ `asNUMBER` Turns `auto PING` OFF (0) or every x seconds
+*  `/crNUMBER` Sets CR to 4/NUMBER (5~8)
+*  `/fqNUMBER` Sets Frequency to NUMBER (860.0 ~ 1,020.0 MHz)
 
 This is still a bit fragile, but seems to be working well enough! Have fun!
 
