@@ -461,9 +461,11 @@ def testFn(line):
     if line.startswith(x[0]):
       if x[2] == 0:
         x[1]()
+        return
       else:
         param = line[len(x[0]):]
         x[1](param)
+        return
 
 if __name__ == "__main__":
   if len(sys.argv) < 2:
