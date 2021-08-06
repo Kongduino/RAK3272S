@@ -1,15 +1,15 @@
 import json
-import serial
 import time
 import sys
 import binascii
-from Crypto import Random
-from Crypto.Cipher import AES
 import datetime
 import uuid
 import hmac
-from pathlib import Path
+#from pathlib import Path
 import select
+#from Crypto import Random
+from Crypto.Cipher import AES
+import serial
 
 msgCount = 0
 aesKey = b'YELLOW SUBMARINEENIRAMBUS WOLLEY'
@@ -32,6 +32,21 @@ pongback = 0
 snr = 0
 rcvRSSI = 0
 
+def calcMaxPayload():
+  mpl = -1
+  if sf == 7:
+    if (bw == 125) | (bw == 250):
+      mpl = 222
+  if sf == 8:
+    if bw == 125:
+      mpl = 222
+  if sf == 9:
+    if bw == 125:
+      mpl = 115
+  if ((sf == 10) | (sf == 11) | (sf == 12)) & (bw == 125):
+    mpl = 51
+  return mpl
+
 def getUUID():
   return str(uuid.uuid4()).split('-')[0]
   # Short UUID for testing. You should use a longer one.
@@ -42,6 +57,11 @@ devName = "RAK3272S_"+getUUID()
 def packOptions():
   fq = int(freq * 1e6)
   opt = str(fq)+":"+str(sf)+":"+str(bw)+":"+str(cr-5)+":"+str(pre)+":"+str(tx)
+  mpl = calcMaxPayload()
+  if mpl > -1:
+    print("Max payload: "+str(mpl)+" bytes")
+  else:
+    print("Invalid SF/BW for payload!")
   return b'AT+P2P='+str.encode(opt)
 
 def displayOptions():
@@ -83,26 +103,26 @@ def readPrefs(fileName):
     print("Decoding JSON has failed. Is this JSON? I don't think it is JSON.")
     print("--------------------------------------")
     return
-  if x.get('sf') != None:
+  if x.get('sf') is not None:
     sf = x['sf']
-  if x.get('bw') != None:
+  if x.get('bw') is not None:
     bw = x['bw']
-  if x.get('freq') != None:
+  if x.get('freq') is not None:
     freq = x['freq']
-  if x.get('pre') != None:
+  if x.get('pre') is not None:
     pre = x['pre']
-  if x.get('cr') != None:
+  if x.get('cr') is not None:
     cr = x['cr']
-  if x.get('tx') != None:
+  if x.get('tx') is not None:
     tx = x['tx']
-  if x.get('hm') != None:
+  if x.get('hm') is not None:
     needHMAC = x['hm']
-  if x.get('pb') != None:
+  if x.get('pb') is not None:
     pongback = x['pb']
-  if x.get('devName') != None:
+  if x.get('devName') is not None:
     devName = x['devName']
   autoping = 0
-  if x.get('ap') != None:
+  if x.get('ap') is not None:
     autoping = x['ap']
     if autoping == 0:
       autoSend = 0
@@ -188,12 +208,121 @@ def sendPacket(packet):
 
 def sendMsg(msg):
   packet = buildPacket(msg)
+  print(packet)
   sendPacket(packet)
 
 def sendPong(UUID):
   packet = buildPongPacket(UUID)
   #print(packet)
   sendPacket(packet)
+
+def setHmac(arg):
+  global needHMAC
+  x = int(arg)
+  if x == 0:
+    needHMAC = 0
+    displayOptions()
+  elif x == 1:
+    needHMAC = 1
+    displayOptions()
+  else:
+    print("Bad argument: "+arg)
+
+def setRP(arg):
+  global pongback
+  x = int(arg)
+  if x == 0:
+    pongback = 0
+    displayOptions()
+  elif x == 1:
+    pongback = 1
+    displayOptions()
+  else:
+    print("Bad argument: "+arg)
+
+def setCr(arg):
+  global cr
+  try:
+    x=int(arg)
+    if x not in range(5, 9):
+      print("Error: "+str(x)+" isn't the in range [5..8]")
+    else:
+      cr = x
+      response = sendCmd(packOptions())
+      time.sleep(3)
+      displayOptions()
+  except ValueError:
+    print("Bad argument: "+arg)
+
+def setTx(arg):
+  global tx
+  try:
+    x=int(arg)
+    if x not in range(7, 23):
+      print("Error: "+str(x)+" isn't the in range [7..22]")
+    else:
+      tx = x
+      response = sendCmd(packOptions())
+      time.sleep(3)
+      displayOptions()
+  except ValueError:
+    print("Bad argument: "+arg)
+
+def setBw(arg):
+  global bw
+  try:
+    x=int(arg)
+    if x not in range(7, 10):
+      print("Error: "+str(x)+" isn't the in range [7..9]")
+    else:
+      bw = x
+      response = sendCmd(packOptions())
+      time.sleep(3)
+      displayOptions()
+  except ValueError:
+    print("Bad argument: "+arg)
+
+def setSf(arg):
+  global sf
+  try:
+    x=int(arg)
+    if x not in range(6, 11):
+      print("Error: "+str(x)+" isn't the in range [6..10]")
+    else:
+      sf = x
+      response = sendCmd(packOptions())
+      time.sleep(3)
+      displayOptions()
+  except ValueError:
+    print("Bad argument: "+arg)
+
+def setFq(arg):
+  global freq
+  try:
+    x=float(arg)
+    if (x < 860.0) | (x > 1020.1):
+      print("Error: "+str(x)+" isn't the in range [860..1,020]")
+    else:
+      freq = v
+      response = sendCmd(packOptions())
+      time.sleep(3)
+      displayOptions()
+  except ValueError:
+    print("Bad argument: "+arg)
+
+def setAs(arg):
+  global autoSend, autoFreq
+  try:
+    x=int(arg)
+    if x == 0:
+      autoSend = 0
+      autoFreq = 60
+    else:
+      autoSend = 1
+      autoFreq = x
+    displayOptions()
+  except ValueError:
+    print("Bad parameter: "+arg)
 
 def initModule(port):
   global ser
@@ -218,7 +347,6 @@ def initModule(port):
       time.sleep(3)
       response = sendCmd(b'AT+PRECV=65535')
       time.sleep(1.5)
-  
   except serial.SerialException as e:
     print("Exception")
     sys.stderr.write('could not open port {!r}: {}\n'.format(args.port, e))
@@ -242,13 +370,13 @@ def displayValues(x):
   elif x["cmd"] == "pong":
     print("rcvRSSI: "+str(x["rcvRSSI"]))
     # A pong message in Minimal_LoRa sends back the RSSI at which it received a PING
-  if x.get('H') != None:
+  if x.get('H') is not None:
     print("Humidity: "+str(x["H"]))
-  if x.get('T') != None:
+  if x.get('T') is not None:
     print("Temperature: "+str(x["T"]))
-  if x.get('V') != None:
+  if x.get('V') is not None:
     print("tVOC: "+str(x["V"]))
-  if x.get('C') != None:
+  if x.get('C') is not None:
     print("CO2: "+str(x["C"]))
 
 def evalLine(z):
@@ -295,7 +423,7 @@ def evalLine(z):
     try:
       dec=cipher.decrypt(msg)
       # decrypt the message
-    except ValueError as e:
+    except ValueError:
       print("Data must be aligned to block boundary in ECB mode")
       print("Len of msg is: "+str(len(msg)))
     try:
@@ -311,6 +439,31 @@ def evalLine(z):
     print("--------------------------------------")
     response = sendCmd(b'AT+PRECV=65535')
     # set back to listening
+
+knownFunctions = [
+  ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
+  ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
+  ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
+  ["/as", setAs, 1]
+]
+
+def testFn(line):
+  # This function takes one line from user input
+  # And looks for a know command (see above)
+  # If the command requires no arguments, 3rd value
+  # in the array is 0, and the Fn is called as is.
+  # Or the remainder of the line is passed as argument.
+  # eg:
+  # '/p' PING, no argument need. ["/p", sendPing, 0]
+  # '/fq' Set Frequency, frequency needs to be passed: ["/fq", setFq, 1]
+  global knownFunctions
+  for x in knownFunctions:
+    if line.startswith(x[0]):
+      if x[2] == 0:
+        x[1]()
+      else:
+        param = line[len(x[0]):]
+        x[1](param)
 
 if __name__ == "__main__":
   if len(sys.argv) < 2:
@@ -334,70 +487,8 @@ if __name__ == "__main__":
         # key press, read a line
         query = input().strip()
         #print("> "+query)
-        if query[0:2] == "/>":
-          sendMsg(query[2:])
-        elif query == "/p":
-          sendPing()
-        elif query == "/hm0":
-          needHMAC = 0
-          displayOptions()
-        elif query == "/hm1":
-          needHMAC = 1
-          displayOptions()
-        elif query == "/r0":
-          pongback = 0
-          displayOptions()
-        elif query == "/r1":
-          pongback = 1
-          displayOptions()
-        elif query[0:3] == "/as":
-          try:
-            v=int(query[3:])
-            if v == 0:
-              autoSend = 0
-              autoFreq = 60
-            else:
-              autoSend = 1
-              autoFreq = v
-            displayOptions()
-          except ValueError:
-            print("Bad parameter: "+query[3:])
-        elif query[0:3] == "/cr":
-          try:
-            v=int(query[3:])
-            if v not in range(5, 9):
-              print("Error: "+str(v)+" isn't the in range [5..8]")
-            else:
-              cr = v
-              response = sendCmd(packOptions())
-              time.sleep(3)
-              displayOptions()
-          except ValueError:
-            print("Bad parameter: "+query[3:])
-        elif query[0:3] == "/tx":
-          try:
-            v=int(query[3:])
-            if v not in range(7, 23):
-              print("Error: "+str(v)+" isn't the in range [7..22]")
-            else:
-              tx = v
-              response = sendCmd(packOptions())
-              time.sleep(3)
-              displayOptions()
-          except ValueError:
-            print("Bad parameter: "+query[3:])
-        elif query[0:3] == "/fq":
-          try:
-            v=float(query[3:])
-            if (v < 860.0) | (v > 1020.0):
-              print("Error: "+str(v)+" isn't the in range [860..1,020]")
-            else:
-              freq = v
-              response = sendCmd(packOptions())
-              time.sleep(3)
-              displayOptions()
-          except ValueError:
-            print("Bad parameter: "+query[3:])
+        testFn(query)
+        # easier way to add commands
       while ser.in_waiting:
         z=ser.readline()
         evalLine(z)

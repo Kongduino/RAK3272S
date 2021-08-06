@@ -45,3 +45,9 @@ This is still a bit fragile, but seems to be working well enough! Have fun!
 
 ![RAK3272S_Minimal_LoRa_#0](ML_0.png)
 ![RAK3272S_Minimal_LoRa_#1](ML_1.png)
+
+Added a `calcMaxPayload()` function that calculates the maximum payload you can send based on the SF/BW configuration. Returns -1 if (supposedly anyway) invalid. Data sourced from [TTN](https://www.thethingsnetwork.org/airtime-calculator). This calculation is displayed when calling `packOptions()`, ie when resetting options for the chip.
+
+## UPDATE 2021/08/06
+
+I refactored the part of the code that parsed user input and evaluates commands. The commands, the relevant Fn, and whether they need an argument or not, is stored in an array, `knownFunctions`. A function, `testFn(line)`, parses the array, and if it finds a match, calls the relevant function. This makes it much easier to add cmmands.
