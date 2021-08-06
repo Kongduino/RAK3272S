@@ -89,3 +89,8 @@ I added a couple of commands:
 * `/PWxxxxxx` Sets password to xxxx
 * `/dnxxxxxx` Sets Device Name to xxxx
 * `/save` Saves prefs to the current prefs file
+
+![RAK3272S_Minimal_LoRa_#2](ML_2.png)
+### Changing a couple of settings and saving
+![RAK3272S_Minimal_LoRa_#3](ML_3.png)
+### Restarting: the new prefs are loaded properly

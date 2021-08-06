@@ -66,10 +66,13 @@ def savePrefs():
   a["pre"] = pre
   a["tx"] = tx
   a["cr"] = cr
-  a["ap"] = autoFreq
-  a["needHMAC"] = needHMAC
-  a["needAES"] = needAES
-  a["pongback"] = pongback
+  if autoSend == 0:
+    a["ap"] = 0
+  else:
+    a["ap"] = autoFreq
+  a["hm"] = needHMAC
+  a["aes"] = needAES
+  a["pb"] = pongback
   print("Opening file "+prefsFile)
   f = open(prefsFile,'w')
   json.dump(a, f)
