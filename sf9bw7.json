@@ -1,9 +1,1 @@
-{
-  "freq":865,
-  "sf":9,
-  "bw":125,
-  "cr":5,
-  "tx":22,
-  "pre":8,
-  "devName":"sf9bw7"
-}
+{"devName": "sf9bw7", "freq": 865, "sf": 9, "bw": 125, "pre": 8, "tx": 22, "cr": 5, "ap": 60, "needHMAC": 1, "needAES": 1, "pongback": 0}

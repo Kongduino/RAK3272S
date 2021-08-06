@@ -80,3 +80,12 @@ def testFn(line):
       return
   print("Unknown command!")
 ```
+
+## UPDATE 2021/08/06, Part Deux
+
+I added a couple of commands:
+
+* `/e0` ~ `/e1` Turns AES OFF or ON
+* `/PWxxxxxx` Sets password to xxxx
+* `/dnxxxxxx` Sets Device Name to xxxx
+* `/save` Saves prefs to the current prefs file

@@ -12,6 +12,7 @@ from Crypto.Cipher import AES
 import serial
 
 msgCount = 0
+needAES = 1
 aesKey = b'YELLOW SUBMARINEENIRAMBUS WOLLEY'
 #Pick your own secret key ;-)
 #32 bytes for AES256
@@ -31,6 +32,7 @@ needHMAC = 1
 pongback = 0
 snr = 0
 rcvRSSI = 0
+prefsFile = "prefs.json"
 
 def calcMaxPayload():
   mpl = -1
@@ -54,6 +56,25 @@ def getUUID():
 devName = "RAK3272S_"+getUUID()
 # So that you can run several instances from the same directory
 
+def savePrefs():
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, prefsFile
+  a = {}
+  a["devName"] = devName
+  a["freq"] = freq
+  a["sf"] = sf
+  a["bw"] = bw
+  a["pre"] = pre
+  a["tx"] = tx
+  a["cr"] = cr
+  a["ap"] = autoFreq
+  a["needHMAC"] = needHMAC
+  a["needAES"] = needAES
+  a["pongback"] = pongback
+  print("Opening file "+prefsFile)
+  f = open(prefsFile,'w')
+  json.dump(a, f)
+  print("Prefs file "+prefsFile+" written.")
+
 def packOptions():
   fq = int(freq * 1e6)
   opt = str(fq)+":"+str(sf)+":"+str(bw)+":"+str(cr-5)+":"+str(pre)+":"+str(tx)
@@ -72,6 +93,10 @@ def displayOptions():
   print(" . Preamble: "+str(pre))
   print(" . CR: 4/"+str(cr))
   print(" . Tx: "+str(tx))
+  if needAES == 1:
+    print(" . AES required")
+  else:
+    print(" . AES not required")
   if needHMAC == 1:
     print(" . HMAC required")
   else:
@@ -86,7 +111,7 @@ def displayOptions():
     print(" . PONG back OFF")
 
 def readPrefs(fileName):
-  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES
   try:
     # Open JSON file
     print("Opening file "+fileName)
@@ -115,6 +140,8 @@ def readPrefs(fileName):
     cr = x['cr']
   if x.get('tx') is not None:
     tx = x['tx']
+  if x.get('aes') is not None:
+    needAES = x['aes']
   if x.get('hm') is not None:
     needHMAC = x['hm']
   if x.get('pb') is not None:
@@ -182,26 +209,29 @@ def sendPacket(packet):
   response = sendCmd(b'AT+PRECV=0')
   # stop listening
   time.sleep(1.0)
-  cipher = AES.new(aesKey, AES.MODE_ECB)
-  # create a cipher, AES256, ECB
   packet=str.encode(json.dumps(packet))
   # encode the dict as a JSON message
-  while len(packet)%16 !=0:
-    packet=packet+b'\x00'
-    # pad length to be a multiple of 16
-    # Ideally the byte should be the number of missing bytes
-    # I'll leave this to you :-)
-  enc = cipher.encrypt(packet)
-  # encrypt the packet
-  if needHMAC == 1:
-    m = hmac.new(hmacKey,b'',"sha224")
-    # create a SHA-224 hmac object with a HMAC key
-    m.update(enc)
-    # pass the encrypted message
-    jPacket = binascii.hexlify(enc+m.digest())
-    # packet + HMAC hex-encoded
+  if needAES == 1:
+    cipher = AES.new(aesKey, AES.MODE_ECB)
+    # create a cipher, AES256, ECB
+    while len(packet)%16 !=0:
+      packet=packet+b'\x00'
+      # pad length to be a multiple of 16
+      # Ideally the byte should be the number of missing bytes
+      # I'll leave this to you :-)
+    enc = cipher.encrypt(packet)
+    # encrypt the packet
+    if needHMAC == 1:
+      m = hmac.new(hmacKey,b'',"sha224")
+      # create a SHA-224 hmac object with a HMAC key
+      m.update(enc)
+      # pass the encrypted message
+      jPacket = binascii.hexlify(enc+m.digest())
+      # packet + HMAC hex-encoded
+    else:
+      jPacket = binascii.hexlify(enc)
   else:
-    jPacket = binascii.hexlify(enc)
+    jPacket = binascii.hexlify(packet)
   response = sendCmd(b'AT+PSEND='+jPacket)
   time.sleep(1.0)
   response = sendCmd(b'AT+PRECV=65535')
@@ -236,6 +266,18 @@ def setRP(arg):
     displayOptions()
   elif x == 1:
     pongback = 1
+    displayOptions()
+  else:
+    print("Bad argument: "+arg)
+
+def setEnc(arg):
+  global needAES
+  x = int(arg)
+  if x == 0:
+    needAES = 0
+    displayOptions()
+  elif x == 1:
+    needAES = 1
     displayOptions()
   else:
     print("Bad argument: "+arg)
@@ -323,6 +365,32 @@ def setAs(arg):
     displayOptions()
   except ValueError:
     print("Bad parameter: "+arg)
+
+def setDeviceName(arg):
+  global devName
+  dn = arg.strip()
+  if dn != "":
+    devName = dn
+    displayOptions()
+  else:
+    print("Empty device name!")
+
+def setPwd(arg):
+  global aesKey
+  key = arg.strip()
+  if len(key) == 32:
+    aesKey = key.encode()
+    displayOptions()
+  elif len(key) == 64:
+    try:
+      key = binascii.unhexlify(a)
+      aesKey = key
+      displayOptions()
+    except binascii.Error:
+      print("Invalid 64-hex string!")
+  else:
+    print("Invalid string length!")
+    print("Please pass either 32-byte plain key or 64-byte hex key")
 
 def initModule(port):
   global ser
@@ -417,18 +485,21 @@ def evalLine(z):
       print("HMAC not needed, so msg = ")
       msg=binascii.unhexlify(bits[1])
       print(msg)
-    cipher = AES.new(aesKey, AES.MODE_ECB)
-    # create a cipher, AES256, ECB
-    dec=""
-    try:
-      dec=cipher.decrypt(msg)
-      # decrypt the message
-    except ValueError:
-      print("Data must be aligned to block boundary in ECB mode")
-      print("Len of msg is: "+str(len(msg)))
+    if needAES == 1:
+      cipher = AES.new(aesKey, AES.MODE_ECB)
+      # create a cipher, AES256, ECB
+      dec=""
+      try:
+        dec = cipher.decrypt(msg)
+        # decrypt the message
+      except ValueError:
+        print("Data must be aligned to block boundary in ECB mode")
+        print("Len of msg is: "+str(len(msg)))
+    else:
+      dec = msg
     try:
       msg=dec.split(b'}')[0]+b'}'
-      # ugly hack to remove extra bytes after }
+        # ugly hack to remove extra bytes after }
       x=json.loads(msg)
       # parse JSON
       displayValues(x)
@@ -444,7 +515,8 @@ knownFunctions = [
   ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
   ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
   ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
-  ["/as", setAs, 1]
+  ["/as", setAs, 1], ["/e", setEnc, 1], ["/dn", setDeviceName, 1],
+  ["/PW", setPwd, 1], ["/save", savePrefs, 0]
 ]
 
 def testFn(line):
@@ -474,10 +546,9 @@ if __name__ == "__main__":
     sys.exit("Leaving now\n================================================================\n\n")
   port = str(sys.argv[1])
   print("Starting with "+port)
-  pFile = "prefs.json"
   if len(sys.argv) == 3:
-    pFile = str(sys.argv[2])
-  readPrefs(pFile)
+    prefsFile = str(sys.argv[2])
+  readPrefs(prefsFile)
   initModule(port)
   while True:
     for i in range(0, autoFreq):
