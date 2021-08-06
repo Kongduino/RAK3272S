@@ -77,5 +77,6 @@ def testFn(line):
       else:
         param = line[len(x[0]):]
         x[1](param)
-
+      return
+  print("Unknown command!")
 ```
