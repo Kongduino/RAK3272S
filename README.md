@@ -50,4 +50,32 @@ Added a `calcMaxPayload()` function that calculates the maximum payload you can 
 
 ## UPDATE 2021/08/06
 
-I refactored the part of the code that parsed user input and evaluates commands. The commands, the relevant Fn, and whether they need an argument or not, is stored in an array, `knownFunctions`. A function, `testFn(line)`, parses the array, and if it finds a match, calls the relevant function. This makes it much easier to add cmmands.
+I refactored the part of the code that parses user input and evaluates commands. The commands, the relevant Fn, and whether they need an argument or not, is stored in an array, `knownFunctions`. A function, `testFn(line)`, parses the array, and if it finds a match, calls the relevant function. This makes it much easier to add commands.
+
+```python
+knownFunctions = [
+  ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
+  ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
+  ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
+  ["/as", setAs, 1]
+]
+
+def testFn(line):
+  # This function takes one line from user input
+  # And looks for a know command (see above)
+  # If the command requires no arguments, 3rd value
+  # in the array is 0, and the Fn is called as is.
+  # Or the remainder of the line is passed as argument.
+  # eg:
+  # '/p' PING, no argument need. ["/p", sendPing, 0]
+  # '/fq' Set Frequency, frequency needs to be passed: ["/fq", setFq, 1]
+  global knownFunctions
+  for x in knownFunctions:
+    if line.startswith(x[0]):
+      if x[2] == 0:
+        x[1]()
+      else:
+        param = line[len(x[0]):]
+        x[1](param)
+
+```
