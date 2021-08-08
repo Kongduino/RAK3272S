@@ -52,12 +52,14 @@ Added a `calcMaxPayload()` function that calculates the maximum payload you can 
 
 I refactored the part of the code that parses user input and evaluates commands. The commands, the relevant Fn, and whether they need an argument or not, is stored in an array, `knownFunctions`. A function, `testFn(line)`, parses the array, and if it finds a match, calls the relevant function. This makes it much easier to add commands.
 
-```python
+```py
 knownFunctions = [
+  # Updated list as of 2021/08/05
   ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
   ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
   ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
-  ["/as", setAs, 1]
+  ["/as", setAs, 1], ["/e", setEnc, 1], ["/dn", setDeviceName, 1],
+  ["/PW", setPwd, 1], ["/save", savePrefs, 0]
 ]
 
 def testFn(line):
@@ -110,4 +112,3 @@ The function has been updated to allow for buffers long than 256 bytes.
 ![hexDump](hexDump.png)
 
 ![hexDump Long](hexDumpLong.png)
-
