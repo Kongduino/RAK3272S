@@ -109,3 +109,5 @@ The function has been updated to allow for buffers long than 256 bytes.
 
 ![hexDump](hexDump.png)
 
+![hexDump Long](hexDumpLong.png)
+
