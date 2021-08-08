@@ -37,9 +37,9 @@ prefsFile = "prefs.json"
 def hexDump(buf, length):
   s = "|"
   t = "| |"
-  print("\n  +------------------------------------------------+ +----------------+")
-  print("  |.0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .a .b .c .d .e .f | |                |")
-  print("  +------------------------------------------------+ +----------------+")
+  print("\n   +------------------------------------------------+ +----------------+")
+  print("   |.0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .a .b .c .d .e .f | |                |")
+  print("   +------------------------------------------------+ +----------------+")
   i = 0
   while i<length:
     j=0
@@ -64,9 +64,12 @@ def hexDump(buf, length):
       j = j + 1
     i = i + 16
     ix = int(i / 16)
-    print((hex(ix)[2:]+'.'+s + t + "|"))
+    if ix>15:
+      print(hex(ix)[2:]+'.'+s + t + "|")
+    else:
+      print(" "+hex(ix)[2:]+'.'+s + t + "|")
     s = "|"; t = "| |";
-  print("  +------------------------------------------------+ +----------------+\n")
+  print("  +------------------------------------------------+  +----------------+\n")
 
 def calcMaxPayload():
   mpl = -1
@@ -273,6 +276,7 @@ def sendPacket(packet):
   else:
     jPacket = binascii.hexlify(packet)
   response = sendCmd(b'AT+PSEND='+jPacket, True, False)
+  hexDump(jPacket.decode(), len(jPacket))
   print("packet sent!")
   time.sleep(1.0)
   response = sendCmd(b'AT+PRECV=65535', True, False)
