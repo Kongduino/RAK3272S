@@ -100,3 +100,10 @@ I added a couple of commands:
 Intercepted the `serial.SerialException` raised when trying to open a non-existent port. The code exists in a much cleaner way.
 
 ![QuittingGracefully](QuittingGracefully.png)
+
+## UPDATE 2021/08/08 Part Deux
+
+Ported my C++ `hexDump()` function to Python to show packets in hex form for debug purposes. Called only during `sendPacket()` for now, but should be added later in a few other places. Finally, it will be made optional with a `#DEBUG`-like define.
+
+![hexDump](hexDump.png)
+

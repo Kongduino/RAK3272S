@@ -34,6 +34,40 @@ snr = 0
 rcvRSSI = 0
 prefsFile = "prefs.json"
 
+def hexDump(buf, length):
+  s = "|"
+  t = "| |"
+  print("\n  +------------------------------------------------+ +----------------+")
+  print("  |.0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .a .b .c .d .e .f | |                |")
+  print("  +------------------------------------------------+ +----------------+")
+  i = 0
+  while i<length:
+    j=0
+    while j<16:
+      n= i + j
+      if n >= length:
+        s = s + "   "
+        t = t + " "
+      else:
+        try:
+          c = ord(buf[n])
+        except KeyError:
+          print("n = "+str(n))
+          print("char = "+buf[n])
+          sys.exit(s+t)
+        a = '0'+(hex(c)[2:])
+        s = s + a[len(a)-2:] + " "
+        if (c < 32) | (c > 127):
+          t = t + "."
+        else:
+          t = t + buf[n]
+      j = j + 1
+    i = i + 16
+    ix = int(i / 16)
+    print((hex(ix)[2:]+'.'+s + t + "|"))
+    s = "|"; t = "| |";
+  print("  +------------------------------------------------+ +----------------+\n")
+
 def calcMaxPayload():
   mpl = -1
   if sf == 7:
@@ -191,10 +225,11 @@ def sendPing():
   sendPacket(packet)
   # and send a packet
 
-def sendCmd(cmd, ignore = True):
+def sendCmd(cmd, ignore = True, showCmd = True):
   ser.write(cmd)
   ser.write(b'\r\n')
-  print(cmd.decode())
+  if showCmd == True:
+    print(cmd.decode())
   time.sleep(1.0)
   b=b''
   if ignore == False:
@@ -209,10 +244,12 @@ def sendCmd(cmd, ignore = True):
   return b
 
 def sendPacket(packet):
-  response = sendCmd(b'AT+PRECV=0')
+  print("sending packet")
+  response = sendCmd(b'AT+PRECV=0', True, False)
   # stop listening
   time.sleep(1.0)
   packet=str.encode(json.dumps(packet))
+  hexDump(packet.decode(), len(packet))
   # encode the dict as a JSON message
   if needAES == 1:
     cipher = AES.new(aesKey, AES.MODE_ECB)
@@ -235,9 +272,10 @@ def sendPacket(packet):
       jPacket = binascii.hexlify(enc)
   else:
     jPacket = binascii.hexlify(packet)
-  response = sendCmd(b'AT+PSEND='+jPacket)
+  response = sendCmd(b'AT+PSEND='+jPacket, True, False)
+  print("packet sent!")
   time.sleep(1.0)
-  response = sendCmd(b'AT+PRECV=65535')
+  response = sendCmd(b'AT+PRECV=65535', True, False)
 
 def sendMsg(msg):
   packet = buildPacket(msg)
@@ -408,6 +446,7 @@ def initModule(port):
   except serial.SerialException as e:
     sys.exit("/!\ Yo Dukie! Port not found! Aborting.")
   time.sleep(1)
+  readPrefs(prefsFile)
   try:
     if ser.isOpen():
       print("\nReady\n===========\n")
@@ -561,10 +600,9 @@ if __name__ == "__main__":
     sys.exit("Leaving now\n================================================================\n\n")
   port = str(sys.argv[1])
   print("Starting with "+port)
-  initModule(port)
   if len(sys.argv) == 3:
     prefsFile = str(sys.argv[2])
-  readPrefs(prefsFile)
+  initModule(port)
   while True:
     for i in range(0, autoFreq):
       # autoFreq x 1-second delays
