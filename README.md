@@ -94,3 +94,8 @@ I added a couple of commands:
 ### Changing a couple of settings and saving
 ![RAK3272S_Minimal_LoRa_#3](ML_3.png)
 ### Restarting: the new prefs are loaded properly
+
+## UPDATE 2021/08/08 (because I never work on August 7!)
+
+Intercepted the `serial.SerialException` raised when trying to open a non-existent port. The code exists in a much cleaner way.
+

@@ -405,8 +405,8 @@ def initModule(port):
   try:
     ser = serial.serial_for_url(port, 9600, timeout = 10)
     # arg 1 is the serial port
-  except FileNotFoundError as e:
-    sys.exit("Port not found! Aborting.")
+  except serial.SerialException as e:
+    sys.exit("/!\ Yo Dukie! Port not found! Aborting.")
   time.sleep(1)
   try:
     if ser.isOpen():
@@ -463,16 +463,28 @@ def evalLine(z):
     bits=z.strip().split(b':')
     #remove \r\n at the end (strip)
     if needHMAC == 1:
-      hm0=binascii.unhexlify(bits[1][-56:])
-      # the last 28 bytes = hmac
+      try:
+        hm0=binascii.unhexlify(bits[1][-56:])
+        # the last 28 bytes = hmac
+      except binascii.Error:
+        print("Odd-length string in evalLine/unhexlify(hm0)")
+        return
       m = hmac.new(hmacKey, b'', "sha224")
       # create an hmac object
-      msg=binascii.unhexlify(bits[1][:-56])
-      # msg is everything except the last 28 bytes
+      try:
+        msg=binascii.unhexlify(bits[1][:-56])
+        # msg is everything except the last 28 bytes
+      except binascii.Error:
+        print("Odd-length string in evalLine/unhexlify(msg)")
+        return
       m.update(msg)
       # create a digest of the message
       cHMAC = m.hexdigest()
-      oHMAC = binascii.hexlify(hm0).decode()
+      try:
+        oHMAC = binascii.hexlify(hm0).decode()
+      except binascii.Error:
+        print("Odd-length string in evalLine/unhexlify(oHMAC)")
+        return
       if cHMAC == oHMAC:
         # compare the stated hmac with the hmac we just calculated
         print("HMAC passed!")
@@ -549,10 +561,10 @@ if __name__ == "__main__":
     sys.exit("Leaving now\n================================================================\n\n")
   port = str(sys.argv[1])
   print("Starting with "+port)
+  initModule(port)
   if len(sys.argv) == 3:
     prefsFile = str(sys.argv[2])
   readPrefs(prefsFile)
-  initModule(port)
   while True:
     for i in range(0, autoFreq):
       # autoFreq x 1-second delays
