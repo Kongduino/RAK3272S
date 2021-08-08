@@ -99,3 +99,4 @@ I added a couple of commands:
 
 Intercepted the `serial.SerialException` raised when trying to open a non-existent port. The code exists in a much cleaner way.
 
+![QuittingGracefully](QuittingGracefully.png)
