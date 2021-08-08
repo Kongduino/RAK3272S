@@ -105,5 +105,7 @@ Intercepted the `serial.SerialException` raised when trying to open a non-existe
 
 Ported my C++ `hexDump()` function to Python to show packets in hex form for debug purposes. Called only during `sendPacket()` for now, but should be added later in a few other places. Finally, it will be made optional with a `#DEBUG`-like define.
 
+The function has been updated to allow for buffers long than 256 bytes.
+
 ![hexDump](hexDump.png)
 
