@@ -1,0 +1,24 @@
+Datetime: 2021/08/09 14:15:37
+  Created log file
+Datetime: 2021/08/09 14:15:42
+  Sent packet:
+  {"from": "sf9bw7", "cmd": "msg", "UUID": "d175bceb", "msg": "Message #0"}
+Datetime: 2021/08/09 14:16:04
+  Sent packet:
+  {"from": "sf9bw7", "cmd": "msg", "UUID": "0108f28e", "msg": "Message #1"}
+Datetime: 2021/08/09 14:16:11
+  Incoming message at RSSI: -15, SNR: 11
+Datetime: 2021/08/09 14:16:11
+  Received message:
+  {"UUID":"4A3F7482","cmd":"ping","from":"BastMobile"}
+Datetime: 2021/08/09 14:16:11
+  Sent packet:
+  {"from": "sf9bw7", "cmd": "pong", "UUID": "4A3F7482", "rcvRSSI": -15}
+Datetime: 2021/08/09 14:16:24
+  Incoming message at RSSI: -15, SNR: 11
+Datetime: 2021/08/09 14:16:24
+  Received message:
+  {"UUID":"2EAFAFFB","cmd":"ping","from":"BastMobile"}
+Datetime: 2021/08/09 14:16:24
+  Sent packet:
+  {"from": "sf9bw7", "cmd": "pong", "UUID": "2EAFAFFB", "rcvRSSI": -15}

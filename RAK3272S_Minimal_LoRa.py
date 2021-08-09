@@ -33,6 +33,7 @@ pongback = 0
 snr = 0
 rcvRSSI = 0
 prefsFile = "prefs.json"
+logsFile = ""
 
 def hexDump(buf, length):
   s = "|"
@@ -62,13 +63,13 @@ def hexDump(buf, length):
         else:
           t = t + buf[n]
       j = j + 1
-    i = i + 16
     ix = int(i / 16)
     if ix>15:
       print(hex(ix)[2:]+'.'+s + t + "|")
     else:
       print(" "+hex(ix)[2:]+'.'+s + t + "|")
     s = "|"; t = "| |";
+    i = i + 16
   print("   +------------------------------------------------+ +----------------+")
 
 def calcMaxPayload():
@@ -94,7 +95,7 @@ devName = "RAK3272S_"+getUUID()
 # So that you can run several instances from the same directory
 
 def savePrefs():
-  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, prefsFile
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, prefsFile, logsFile
   a = {}
   a["devName"] = devName
   a["freq"] = freq
@@ -114,6 +115,25 @@ def savePrefs():
   f = open(prefsFile,'w')
   json.dump(a, f)
   print("Prefs file "+prefsFile+" written.")
+  f = open(logsFile,'a')
+  dt = datetime.datetime.now()
+  f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+  f.write("  Prefs file "+prefsFile+" written.\n")
+  f.write(" . devName = "+devName+"\n")
+  f.write(" . freq = "+str(freq)+"\n")
+  f.write(" . sf = "+str(sf)+"\n")
+  f.write(" . bw = "+str(bw)+"\n")
+  f.write(" . pre = "+str(pre)+"\n")
+  f.write(" . tx = "+str(tx)+"\n")
+  f.write(" . cr = "+str(cr)+"\n")
+  if autoSend == 0:
+    f.write(" . ap = 0\n")
+  else:
+    f.write(" . ap = "+str(autoFreq)+"\n")
+  f.write(" . hm = "+str(needHMAC)+"\n")
+  f.write(" . aes = "+str(needAES)+"\n")
+  f.write(" . pb = "+str(pongback)+"\n")
+  f.close()
 
 def packOptions():
   fq = int(freq * 1e6)
@@ -151,7 +171,7 @@ def displayOptions():
     print(" . PONG back OFF")
 
 def readPrefs(fileName):
-  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, logsFile
   try:
     # Open JSON file
     print("Opening file "+fileName)
@@ -196,6 +216,11 @@ def readPrefs(fileName):
     else:
       autoSend = 1
       autoFreq = autoping
+  f = open(logsFile,'a')
+  dt = datetime.datetime.now()
+  f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+  f.write("  Read prefs file "+prefsFile+".\n")
+  f.close()
   displayOptions()
 
 def buildPacket(msg):
@@ -247,7 +272,15 @@ def sendCmd(cmd, ignore = True, showCmd = True):
   return b
 
 def sendPacket(packet):
+  global logsFile
   print("sending packet")
+  f = open(logsFile,'a')
+  dt = datetime.datetime.now()
+  f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+  f.write("  Sent packet:\n  ")
+  f.write(json.dumps(packet))
+  f.write('\n')
+  f.close()
   response = sendCmd(b'AT+PRECV=0', True, False)
   # stop listening
   time.sleep(1.0)
@@ -273,10 +306,11 @@ def sendPacket(packet):
       # packet + HMAC hex-encoded
     else:
       jPacket = binascii.hexlify(enc)
+    hexDump(jPacket.decode(), len(jPacket))
   else:
     jPacket = binascii.hexlify(packet)
+    hexDump(packet, len(packet))
   response = sendCmd(b'AT+PSEND='+jPacket, True, False)
-  hexDump(jPacket.decode(), len(jPacket))
   print("packet sent!")
   time.sleep(1.0)
   response = sendCmd(b'AT+PRECV=65535', True, False)
@@ -494,13 +528,19 @@ def displayValues(x):
     print("CO2: "+str(x["C"]))
 
 def evalLine(z):
-  global snr, rcvRSSI
+  global snr, rcvRSSI, logsFile
   if z.startswith(b'+EVT:RXP2P'):
     # +EVT:RXP2P, RSSI: -xx, SNR: -yy
     bits = z.strip().split(b', ')
     snr = bits[2].split(b' ')[1]
     rcvRSSI = bits[1].split(b' ')[1]
+    print("\n--------------------------------------")
     print((b'Incoming message at RSSI: '+rcvRSSI+b', SNR: '+snr).decode())
+    f = open(logsFile,'a')
+    dt = datetime.datetime.now()
+    f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+    f.write((b'  Incoming message at RSSI: '+rcvRSSI+b', SNR: '+snr+b'\n').decode())
+    f.close()
   elif z.startswith(b'+EVT:'):
     # The message, hex encoded
     bits=z.strip().split(b':')
@@ -540,9 +580,9 @@ def evalLine(z):
         print("Original HMAC: "+oHMAC)
         print("Calculated HMAC: "+cHMAC)
     else:
-      print("HMAC not needed, so msg = ")
+      #print("HMAC not needed, so msg = ")
       msg=binascii.unhexlify(bits[1])
-      print(msg)
+      #print(msg)
     if needAES == 1:
       cipher = AES.new(aesKey, AES.MODE_ECB)
       # create a cipher, AES256, ECB
@@ -553,12 +593,20 @@ def evalLine(z):
       except ValueError:
         print("Data must be aligned to block boundary in ECB mode")
         print("Len of msg is: "+str(len(msg)))
+        return
     else:
       dec = msg
     try:
-      msg=dec.split(b'}')[0]+b'}'
-        # ugly hack to remove extra bytes after }
-      x=json.loads(msg)
+      dec=dec.split(b'}')[0]+b'}'
+      # ugly hack to remove extra bytes after }
+      f = open(logsFile,'a')
+      dt = datetime.datetime.now()
+      f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+      f.write('  Received message:\n  ')
+      f.write(dec.decode())
+      f.write('\n')
+      f.close()
+      x=json.loads(dec)
       # parse JSON
       displayValues(x)
     except ValueError:  # includes simplejson.decoder.JSONDecodeError
@@ -606,7 +654,14 @@ if __name__ == "__main__":
   print("Starting with "+port)
   if len(sys.argv) == 3:
     prefsFile = str(sys.argv[2])
+  logsFile = "Log_"+getUUID()+".log"
+  print(logsFile)
   initModule(port)
+  f = open(logsFile,'w')
+  dt = datetime.datetime.now()
+  f.write("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S')+"\n")
+  f.write("  Created log file\n")
+  f.close()
   while True:
     for i in range(0, autoFreq):
       # autoFreq x 1-second delays
