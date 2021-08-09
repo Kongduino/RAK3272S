@@ -112,3 +112,9 @@ The function has been updated to allow for buffers long than 256 bytes.
 ![hexDump](hexDump.png)
 
 ![hexDump Long](hexDumpLong.png)
+
+## UPDATE 2021/08/09
+
+I added logs: main events (saving prefs, sending/receiving packets) are logged to a new log file, created at startup time from a random UUID: `Log_<UUID>.log`. I will this functionality optional, but for now, while I am testing, I'll leave it on.
+
+![Logs](Logs.png)
