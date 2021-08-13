@@ -424,7 +424,7 @@ def setFq(arg):
     if (x < 860.0) | (x > 1020.1):
       print("Error: "+str(x)+" isn't the in range [860..1,020]")
     else:
-      freq = v
+      freq = x
       response = sendCmd(packOptions())
       time.sleep(3)
       displayOptions()
