@@ -1,18 +1,10 @@
-import json
-import time
-import sys
-import binascii
-import datetime
-import uuid
-import hmac
 #from pathlib import Path
-import select
-#from Crypto import Random
+import json, time, sys, binascii, datetime, uuid, hmac, select, serial, math
+from Crypto import Random # python3 -m pip install cryptodome
 from Crypto.Cipher import AES
-import serial
 
 msgCount = 0
-needAES = 1
+needAES = 0
 aesKey = b'YELLOW SUBMARINEENIRAMBUS WOLLEY'
 #Pick your own secret key ;-)
 #32 bytes for AES256
@@ -26,14 +18,33 @@ bw = 125
 pre = 8
 tx = 22
 cr = 5
-autoSend = 1
+autoSend = True
 autoFreq = 60
-needHMAC = 1
+needHMAC = 0
 pongback = 0
 snr = 0
 rcvRSSI = 0
 prefsFile = "prefs.json"
 logsFile = ""
+addGPS = False
+latitude = 0.0
+longitude = 0.0
+rnd = Random.new()
+updateMSL = False
+
+def toRad(x):
+  return x * 3.141592653 / 180
+
+def haversine(lat1, lon1, lat2, lon2):
+  R = 6371
+  x1 = lat2-lat1
+  dLat = toRad(x1)
+  x2 = lon2-lon1
+  dLon = toRad(x2)
+  a = math.sin(dLat/2) * math.sin(dLat/2) + math.cos(toRad(lat1)) * math.cos(toRad(lat2)) * math.sin(dLon/2) * math.sin(dLon/2)
+  c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+  d = R * c
+  return round((d + 2.220446049250313e-16) * 100) / 100
 
 def hexDump(buf, length):
   s = "|"
@@ -95,7 +106,9 @@ devName = "RAK3272S_"+getUUID()
 # So that you can run several instances from the same directory
 
 def savePrefs():
-  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, prefsFile, logsFile
+  """Saves preferences to disk."""
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, aesKey, prefsFile, logsFile
+  global addGPS, latitude, longitude
   a = {}
   a["devName"] = devName
   a["freq"] = freq
@@ -104,12 +117,19 @@ def savePrefs():
   a["pre"] = pre
   a["tx"] = tx
   a["cr"] = cr
-  if autoSend == 0:
+  if autoSend == False:
     a["ap"] = 0
   else:
     a["ap"] = autoFreq
   a["hm"] = needHMAC
-  a["aes"] = needAES
+  if needAES:
+    a["aes"] = 1
+    a["aesPWD"] = binascii.b2a_base64(aesKey)
+  else:
+    a["aes"] = 0
+  if addGPS:
+    a["addGPS"] = f'{latitude},{longitude}'
+  # if addGPS is False, not setting it in the settings will do just that
   a["pb"] = pongback
   print("Opening file "+prefsFile)
   f = open(prefsFile,'w')
@@ -126,7 +146,7 @@ def savePrefs():
   f.write(" . pre = "+str(pre)+"\n")
   f.write(" . tx = "+str(tx)+"\n")
   f.write(" . cr = "+str(cr)+"\n")
-  if autoSend == 0:
+  if autoSend == False:
     f.write(" . ap = 0\n")
   else:
     f.write(" . ap = "+str(autoFreq)+"\n")
@@ -146,6 +166,7 @@ def packOptions():
   return b'AT+P2P='+str.encode(opt)
 
 def displayOptions():
+  global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, prefsFile, logsFile
   print(" . Freq: "+str(freq)+" MHz")
   print(" . Device name: "+str(devName))
   print(" . SF: "+str(sf))
@@ -161,7 +182,7 @@ def displayOptions():
     print(" . HMAC required")
   else:
     print(" . HMAC not required")
-  if autoSend == 1:
+  if autoSend:
     print(" . autoSend: every "+str(autoFreq)+"s")
   else:
     print(" . No auto ping")
@@ -172,6 +193,7 @@ def displayOptions():
 
 def readPrefs(fileName):
   global devName, freq, sf, bw, pre, cr, tx, needHMAC, autoSend, autoFreq, pongback, needAES, logsFile
+  global addGPS, latitude, longitude
   try:
     # Open JSON file
     print("Opening file "+fileName)
@@ -201,20 +223,46 @@ def readPrefs(fileName):
   if x.get('tx') is not None:
     tx = x['tx']
   if x.get('aes') is not None:
-    needAES = x['aes']
+    needAES = (x['aes'] == 1)
+    # {"aes" : 0/1}
+    if needAES == True:
+      if x.get('aesPWD') is None:
+        needAES = False # well duh
+      else:
+        aesKey = binascii.a2b_base64(x.get('aesPWD'))
+  else:
+    needAES = False
   if x.get('hm') is not None:
     needHMAC = x['hm']
   if x.get('pb') is not None:
     pongback = x['pb']
   if x.get('devName') is not None:
     devName = x['devName']
+  if x.get('addGPS') is not None:
+    print(x['addGPS'])
+    try:
+      coords = x['addGPS'].split(",")
+      myLat = float(coords[0])
+      myLong = float(coords[1])
+      if myLat < -90.0 or myLat > 90.0 or myLong < -180.0 or myLong > 180.0:
+        print("Incorrect home base GPS coords. addGPS = False")
+        addGPS = False
+      else:
+        latitude = myLat
+        longitude = myLong
+        addGPS = True
+    except:
+      print("Failed to load proper home base GPS coords. addGPS = False")
+      addGPS = False
+  else:
+    addGPS = False
   autoping = 0
   if x.get('ap') is not None:
     autoping = x['ap']
     if autoping == 0:
-      autoSend = 0
+      autoSend = False
     else:
-      autoSend = 1
+      autoSend = True
       autoFreq = autoping
   f = open(logsFile,'a')
   dt = datetime.datetime.now()
@@ -223,23 +271,29 @@ def readPrefs(fileName):
   f.close()
   displayOptions()
 
-def buildPacket(msg):
+def buildPacket(cmd, msg):
   global msgCount
   a = {}
   a['from'] = devName
-  a['cmd'] = "msg"
   a['UUID'] = getUUID()
   a['msg'] = msg
+  a['cmd'] = cmd
   return a
 
 def buildAutoPacket():
-  global msgCount
-  a = buildPacket("Message #"+str(msgCount))
+  global msgCount, updateMSL
+  msg = "Message #"+str(msgCount)
   msgCount += 1
+  if updateMSL != False:
+    cmd = "MSL:{:.2f}".format(updateMSL)
+    updateMSL = False
+  else:
+    cmd = "ping"
+  a = buildPacket(cmd, msg)
   return a
 
 def buildPongPacket(UUID):
-  global snr, rcvRSSI
+  global snr, rcvRSSI, devName
   a = {}
   a['from'] = devName
   a['cmd'] = "pong"
@@ -248,6 +302,7 @@ def buildPongPacket(UUID):
   return a
 
 def sendPing():
+  """Sends a ping packet."""
   packet = buildAutoPacket()
   # create a dict with an auto-generated message
   sendPacket(packet)
@@ -272,7 +327,9 @@ def sendCmd(cmd, ignore = True, showCmd = True):
   return b
 
 def sendPacket(packet):
-  global logsFile
+  global logsFile, addGPS, latitude, longitude
+  if addGPS:
+    packet['gps'] = "{:.6f},{:.6f}".format(latitude, longitude)
   print("sending packet")
   f = open(logsFile,'a')
   dt = datetime.datetime.now()
@@ -288,13 +345,15 @@ def sendPacket(packet):
   hexDump(packet.decode(), len(packet))
   # encode the dict as a JSON message
   if needAES == 1:
-    cipher = AES.new(aesKey, AES.MODE_ECB)
-    # create a cipher, AES256, ECB
+    nonce = rnd.read(16)
+    cipher = AES.new(aesKey, AES.MODE_CBC, nonce)
+    # create a cipher, AES256, CBC
     while len(packet)%16 !=0:
-      packet=packet+b'\x00'
+      packet = packet+b'\x00'
       # pad length to be a multiple of 16
       # Ideally the byte should be the number of missing bytes
       # I'll leave this to you :-)
+    print(packet)
     enc = cipher.encrypt(packet)
     # encrypt the packet
     if needHMAC == 1:
@@ -302,20 +361,21 @@ def sendPacket(packet):
       # create a SHA-224 hmac object with a HMAC key
       m.update(enc)
       # pass the encrypted message
-      jPacket = binascii.hexlify(enc+m.digest())
+      enc = enc+m.digest()
       # packet + HMAC hex-encoded
-    else:
-      jPacket = binascii.hexlify(enc)
-    hexDump(jPacket.decode(), len(jPacket))
+    enc = nonce+enc # add nonce
   else:
-    jPacket = binascii.hexlify(packet)
-    hexDump(packet, len(packet))
+    enc = packet
+    # not really encrypted, but I need a single var
+  jPacket = binascii.hexlify(enc)
+  hexDump(jPacket.decode(), len(jPacket))
   response = sendCmd(b'AT+PSEND='+jPacket, True, False)
   print("packet sent!")
   time.sleep(1.0)
-  response = sendCmd(b'AT+PRECV=65535', True, False)
+  response = sendCmd(b'AT+PRECV=65535', True, True)
 
 def sendMsg(msg):
+  """Sends a custom packet (message)."""
   packet = buildPacket(msg)
   print(packet)
   sendPacket(packet)
@@ -325,7 +385,33 @@ def sendPong(UUID):
   #print(packet)
   sendPacket(packet)
 
+def setGPS(arg):
+  """Sets GPS coords (or turns off GPS location)."""
+  global addGPS, latitude, longitude
+  if arg.lower().strip() == 'off':
+    addGPS = False
+    print("Turning off GPS position in packets.")
+    return
+  args = arg.replace(' ', '').split(',')
+  if len(args) != 2:
+    print("I need exactly 2 args, latitude and longitude. Aborting!")
+    return
+  try:
+    LAT = float(args[1])
+    LON = float(args[2])
+    if LAT < -90.0 or LAT > 90.0 or LON < -180.0 or LON > 180.0:
+      print("Incorrect GPS args!. Aborting!")
+      return
+    latitude = LAT
+    longitude = LON
+    print("Setting GPS coords to: {:.8f},{:.8f}".format(LAT, LON))
+    return
+  except:
+    print("Incorrect GPS coords!. Aborting!")
+    return
+
 def setHmac(arg):
+  """Sets HMAC parameter (0/1)."""
   global needHMAC
   x = int(arg)
   if x == 0:
@@ -338,6 +424,7 @@ def setHmac(arg):
     print("Bad argument: "+arg)
 
 def setRP(arg):
+  """Sets pong back parameter (0/1)."""
   global pongback
   x = int(arg)
   if x == 0:
@@ -350,6 +437,7 @@ def setRP(arg):
     print("Bad argument: "+arg)
 
 def setEnc(arg):
+  """Sets AES encryption parameter (0/1)."""
   global needAES
   x = int(arg)
   if x == 0:
@@ -362,6 +450,7 @@ def setEnc(arg):
     print("Bad argument: "+arg)
 
 def setCr(arg):
+  """Sets C/R parameter (5..8)."""
   global cr
   try:
     x=int(arg)
@@ -376,6 +465,7 @@ def setCr(arg):
     print("Bad argument: "+arg)
 
 def setTx(arg):
+  """Sets Tx power (7..22)."""
   global tx
   try:
     x=int(arg)
@@ -390,6 +480,7 @@ def setTx(arg):
     print("Bad argument: "+arg)
 
 def setBw(arg):
+  """Sets bandwidth parameter (7..9)."""
   global bw
   try:
     x=int(arg)
@@ -404,11 +495,12 @@ def setBw(arg):
     print("Bad argument: "+arg)
 
 def setSf(arg):
+  """Sets spreading factor parameter (6..12)."""
   global sf
   try:
     x=int(arg)
-    if x not in range(6, 11):
-      print("Error: "+str(x)+" isn't the in range [6..10]")
+    if x not in range(6, 13):
+      print("Error: "+str(x)+" isn't the in range [6..12]")
     else:
       sf = x
       response = sendCmd(packOptions())
@@ -417,7 +509,21 @@ def setSf(arg):
   except ValueError:
     print("Bad argument: "+arg)
 
+def sendMSL(arg):
+  """Sets Mean Sea Level air pressure (dor altitude calculation)."""
+  global updateMSL
+  MSL = float(arg)
+  if MSL >= 1083.8 and MSL <= 652.5:
+    print("Error: "+str(MSL)+" isn't the in range [652.5..1083.8]")
+  else:
+    updateMSL = MSL
+    if autoSend:
+      print("Will update next ping")
+    else:
+      sendPing()
+
 def setFq(arg):
+  """Sets LoRa frequency."""
   global freq
   try:
     x=float(arg)
@@ -432,20 +538,22 @@ def setFq(arg):
     print("Bad argument: "+arg)
 
 def setAs(arg):
+  """Sets autosend parameter (0/XX seconds)."""
   global autoSend, autoFreq
   try:
     x=int(arg)
     if x == 0:
-      autoSend = 0
+      autoSend = False
       autoFreq = 60
     else:
-      autoSend = 1
+      autoSend = True
       autoFreq = x
     displayOptions()
   except ValueError:
     print("Bad parameter: "+arg)
 
 def setDeviceName(arg):
+  """Sets device name."""
   global devName
   dn = arg.strip()
   if dn != "":
@@ -455,6 +563,7 @@ def setDeviceName(arg):
     print("Empty device name!")
 
 def setPwd(arg):
+  """Sets AES encryption key."""
   global aesKey
   key = arg.strip()
   if len(key) == 32:
@@ -472,9 +581,8 @@ def setPwd(arg):
     print("Please pass either 32-byte plain key or 64-byte hex key")
 
 def initModule(port):
-  global ser
-  global autoFreq
-  if autoSend != 1:
+  global ser, autoFreq, autoSend
+  if autoSend == False:
     autoFreq = 60
   # if autoSend is off make that 60
   # used in the main loop
@@ -502,33 +610,51 @@ def initModule(port):
       ser.close()
 
 def displayValues(x):
+  global latitude, longitude, addGPS
   dt= datetime.datetime.now()
   print("Datetime: " + dt.strftime('%Y/%m/%d %H:%M:%S'))
   # Display date and time
-  print("UUID: "+x["UUID"])
-  print("from: "+x["from"])
-  print("cmd: "+x["cmd"])
+  s = x.pop("UUID")
+  print("UUID: " + s)
+  s = x.pop("from")
+  print("from: " + s)
+  s = x.pop("cmd")
+  print("cmd: " + s)
   # all packets have these 3.
-  if x["cmd"] == "msg":
+  if s == "msg":
     print(x["msg"])
-    return
-  elif x["cmd"] == "ping":
+  elif s == "ping":
     if pongback == 1:
       sendPong(x["UUID"])
-  elif x["cmd"] == "pong":
+  elif s == "pong":
     print("rcvRSSI: "+str(x["rcvRSSI"]))
     # A pong message in Minimal_LoRa sends back the RSSI at which it received a PING
-  if x.get('H') is not None:
-    print("Humidity: "+str(x["H"]))
-  if x.get('T') is not None:
-    print("Temperature: "+str(x["T"]))
-  if x.get('V') is not None:
-    print("tVOC: "+str(x["V"]))
-  if x.get('C') is not None:
-    print("CO2: "+str(x["C"]))
+  for s in x:
+    if s == 'gps' and addGPS:
+      if x['gps'] != 'None':
+        # we should have gps data here
+        coords = x['gps'].split(',')
+        lat0 = float(coords[0])
+        long0 = float(coords[1])
+        print("{}: {:.8f},{:.8f}".format(s, lat0, long0))
+        distance = haversine(latitude, longitude, lat0, long0)
+        if distance > 999.9:
+          unit = 'km'
+          distance = distance / 1000.0
+        else:
+          unit = 'm'
+        msg = "  Distance: {} {}".format(distance, unit)
+      else:
+        msg = "  Distance: unknown"
+      print(msg)
+      f = open(logsFile,'a')
+      f.write(msg+"\n")
+      f.close()
+    elif s != 'gps':
+      print("{}: {}".format(s, x[s]))
 
 def evalLine(z):
-  global snr, rcvRSSI, logsFile
+  global snr, rcvRSSI, logsFile, aesKey
   if z.startswith(b'+EVT:RXP2P'):
     # +EVT:RXP2P, RSSI: -xx, SNR: -yy
     bits = z.strip().split(b', ')
@@ -584,14 +710,14 @@ def evalLine(z):
       msg=binascii.unhexlify(bits[1])
       #print(msg)
     if needAES == 1:
-      cipher = AES.new(aesKey, AES.MODE_ECB)
-      # create a cipher, AES256, ECB
+      cipher = AES.new(aesKey, AES.MODE_CBC, msg[0:16])
+      # create a cipher, AES256, CBC
       dec=""
       try:
-        dec = cipher.decrypt(msg)
+        dec = cipher.decrypt(msg[16:])
         # decrypt the message
       except ValueError:
-        print("Data must be aligned to block boundary in ECB mode")
+        print("Data must be aligned to block boundary in CBC mode")
         print("Len of msg is: "+str(len(msg)))
         return
     else:
@@ -617,12 +743,22 @@ def evalLine(z):
     response = sendCmd(b'AT+PRECV=65535')
     # set back to listening
 
+def showHelp():
+  """Shows this help."""
+  global knownFunctions
+  for x in knownFunctions:
+    cmd = x[0]
+    fun = x[1].__doc__
+    args = x[2]
+    print(f"{cmd}:\t {fun}\t {args} args")
+
 knownFunctions = [
   ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
   ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
   ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
   ["/as", setAs, 1], ["/e", setEnc, 1], ["/dn", setDeviceName, 1],
-  ["/PW", setPwd, 1], ["/save", savePrefs, 0]
+  ["/PW", setPwd, 1], ["/save", savePrefs, 0], ["/msl", sendMSL, 1],
+  ["/gps", setGPS, 1], ["/help", showHelp, 0]
 ]
 
 def testFn(line):
@@ -667,7 +803,7 @@ if __name__ == "__main__":
       # autoFreq x 1-second delays
       # 60 by default if autoSend is off
       # check whether there's anything incoming from the serial port
-      dr,dw,de = select.select([sys.stdin], [], [], 0)
+      dr, dw, de = select.select([sys.stdin], [], [], 0)
       if dr != []:
         # key press, read a line
         query = input().strip()
@@ -678,5 +814,5 @@ if __name__ == "__main__":
         z=ser.readline()
         evalLine(z)
       time.sleep(1)
-    if autoSend == 1:
+    if autoSend:
         sendPing()

@@ -33,13 +33,16 @@ So while I confer with the product team, I have changed the SF/BW combo to SF 10
 
 I have added a few commands from Minimal_LoRa:
 
-* `/p` Sends a `PING` packet
-* `/>xxxx` Sends xxxx as a message
-* `/hm0` ~ `/hm1` Turns `HMAC` OFF or ON
-* `/r0` ~ `/r1` Turns `PONG back` OFF or ON (R = reply)
-*  `/as0` ~ `asNUMBER` Turns `auto PING` OFF (0) or every x seconds
-*  `/crNUMBER` Sets CR to 4/NUMBER (5~8)
-*  `/fqNUMBER` Sets Frequency to NUMBER (860.0 ~ 1,020.0 MHz)
+```python
+knownFunctions = [
+  ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
+  ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
+  ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
+  ["/as", setAs, 1], ["/e", setEnc, 1], ["/dn", setDeviceName, 1],
+  ["/PW", setPwd, 1], ["/save", savePrefs, 0], ["/msl", sendMSL, 1],
+  ["/gps", setGPS, 1], ["/help", showHelp, 0]
+]
+```
 
 This is still a bit fragile, but seems to be working well enough! Have fun!
 
@@ -118,3 +121,42 @@ The function has been updated to allow for buffers long than 256 bytes.
 I added logs: main events (saving prefs, sending/receiving packets) are logged to a new log file, created at startup time from a random UUID: `Log_<UUID>.log`. I will this functionality optional, but for now, while I am testing, I'll leave it on.
 
 ![Logs](Logs.png)
+
+## UPDATE 2023/05/03:
+
+I have added more commands, including `/help` and `gps`. This is also reflected in the preferences, where the GPS position will be saved, if added manually via the `/gps` command. JSON keyword `addGPS`. As shown below, the `/help` commands provides an explanation of the commands (the `__doc__` property of each function).
+
+```python
+knownFunctions = [
+  ["/p", sendPing, 0], ["/>", sendMsg, 1], ["/hm", setHmac, 1],
+  ["/cr", setCr, 1], ["/tx", setTx, 1], ["/bw", setBw, 1],
+  ["/sf", setSf, 1], ["/r", setRP, 1], ["/fq", setFq, 1],
+  ["/as", setAs, 1], ["/e", setEnc, 1], ["/dn", setDeviceName, 1],
+  ["/PW", setPwd, 1], ["/save", savePrefs, 0], ["/msl", sendMSL, 1],
+  ["/gps", setGPS, 1], ["/help", showHelp, 0]
+]
+```
+Here's the output of the `/help` command:
+
+```
+/help
+/p:	Sends a ping packet.	0 args
+/>:	Sends a custom packet (message).	1 args
+/hm:	Sets HMAC parameter (0/1).	1 args
+/cr:	Sets C/R parameter (5..8).	1 args
+/tx:	Sets Tx power (7..22).	1 args
+/bw:	Sets bandwidth parameter (7..9).	1 args
+/sf:	Sets spreading factor parameter (6..12).	1 args
+/r:	Sets pong back parameter (0/1).	1 args
+/fq:	Sets LoRa frequency.	1 args
+/as:	Sets autosend parameter (0/XX seconds).	1 args
+/e:	Sets AES encryption parameter (0/1).	1 args
+/dn:	Sets device name.	1 args
+/PW:	Sets AES encryption key.	1 args
+/save:	Saves preferences to disk.	0 args
+/msl:	Sets Mean Sea Level air pressure (dor altitude calculation).	1 args
+/gps:	Sets GPS coords (or turns off GPS location).	1 args
+/help:	Shows this help.	0 args
+```
+
+![startup](ML_4.png)
